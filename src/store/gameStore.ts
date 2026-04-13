@@ -1,11 +1,11 @@
-type Player = {
+export type Player = {
   id: string; // socket.id
   username: string;
   score: number;
   attemptsLeft: number;
 };
 
-type GameSession = {
+export type GameSession = {
   id: string;
   players: Player[];
   gameMaster: string; // socket.id
