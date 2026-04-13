@@ -186,9 +186,41 @@ socket.on("submit_answer", ({ sessionId, answer }) => {
   });
 });
 
-  socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
-  });
+// Player disconnect
+ socket.on("disconnect", () => {
+  for (const sessionId in gameSessions) {
+    const session = gameSessions[sessionId];
+
+    const playerIndex = session.players.findIndex(
+      (p) => p.id === socket.id
+    );
+
+    if (playerIndex !== -1) {
+      session.players.splice(playerIndex, 1);
+
+      io.to(sessionId).emit("player_left", session.players);
+
+      // delete session if empty
+      if (session.players.length === 0) {
+        delete gameSessions[sessionId];
+        console.log(`Session deleted: ${sessionId}`);
+      }
+
+      // if game master left → assign new master
+      if (session.gameMaster === socket.id && session.players.length > 0) {
+        session.gameMaster = session.players[0].id;
+
+        io.to(sessionId).emit("new_game_master", {
+          gameMaster: session.gameMaster,
+        });
+      }
+
+      break;
+    }
+  }
+
+  console.log("User disconnected:", socket.id);
+});
 
 });
 
