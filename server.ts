@@ -24,7 +24,7 @@ io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
   socket.emit("create_session", { username: "testUser" });
 
-//   Session created
+  //   Session created
   socket.on("create_session", ({ username }) => {
     const sessionId = Math.random().toString(36).substring(2, 8);
 
@@ -54,174 +54,186 @@ io.on("connection", (socket) => {
     console.log("Session created:", sessionId);
   });
 
-//   other users
-socket.on("join_session", ({ sessionId, username }) => {
-  const session = gameSessions[sessionId];
-
-  if (!session) {
-    return socket.emit("error", "Session not found");
-  }
-
-  if (session.status !== "waiting") {
-    return socket.emit("error", "Game already in progress");
-  }
-
-  const playerExists = session.players.find(p => p.id === socket.id);
-  if (playerExists) return;
-
-  const newPlayer = {
-    id: socket.id,
-    username,
-    score: 0,
-    attemptsLeft: 3,
-  };
-
-  session.players.push(newPlayer);
-
-  socket.join(sessionId);
-
-  io.to(sessionId).emit("player_joined", session.players);
-
-  console.log(`Player joined session ${sessionId}`);
-});
-
-// Start game
-socket.on("start_game", ({ sessionId }) => {
-  const session = gameSessions[sessionId];
-
-  if (!session) {
-    return socket.emit("error", "Session not found");
-  }
-
-  if (session.gameMaster !== socket.id) {
-    return socket.emit("error", "Only game master can start the game");
-  }
-
-  if (session.players.length < 3) {
-    return socket.emit("error", "At least 3 players required");
-  }
-
-  session.status = "in-progress";
-  startGameTimer(sessionId);
-
-  io.to(sessionId).emit("game_started");
-
-  console.log(`Game started in session ${sessionId}`);
-});
-
-// Game Master sets question & answer
-socket.on("set_question", ({ sessionId, question, answer }) => {
-  const session = gameSessions[sessionId];
-
-  if (!session) {
-    return socket.emit("error", "Session not found");
-  }
-
-  if (session.gameMaster !== socket.id) {
-    return socket.emit("error", "Only game master can set question");
-  }
-
-  if (session.status !== "in-progress") {
-    return socket.emit("error", "Game not started");
-  }
-
-  session.question = question;
-  session.answer = answer.toLowerCase();
-
-  // reset attempts for all players
-  session.players.forEach(player => {
-    player.attemptsLeft = 3;
-  });
-
-  io.to(sessionId).emit("question_set", {
-    question: session.question,
-  });
-
-  console.log(`Question set for session ${sessionId}`);
-});
-
-// Players submit answers
-socket.on("submit_answer", ({ sessionId, answer }) => {
-  const session = gameSessions[sessionId];
-
-  if (!session) {
-    return socket.emit("error", "Session not found");
-  }
-
-  if (session.status !== "in-progress") {
-    return socket.emit("error", "Game not active");
-  }
-
-  const player = session.players.find(p => p.id === socket.id);
-
-  if (!player) {
-    return socket.emit("error", "Player not in session");
-  }
-
-  if (player.attemptsLeft <= 0) {
-    return socket.emit("error", "No attempts left");
-  }
-
-  player.attemptsLeft--;
-
-  const normalizedAnswer = answer.toLowerCase();
-
-  if (normalizedAnswer === session.answer) {
-    session.status = "ended";
-
-    player.score += 10;
-
-    io.to(sessionId).emit("game_ended", {
-      winner: player.username,
-      answer: session.answer,
-      players: session.players,
-    });
-
-    console.log(`Winner: ${player.username}`);
-    return;
-  }
-
-  socket.emit("wrong_answer", {
-    attemptsLeft: player.attemptsLeft,
-  });
-});
-
-// Player disconnect
- socket.on("disconnect", () => {
-  for (const sessionId in gameSessions) {
+  //   other users
+  socket.on("join_session", ({ sessionId, username }) => {
     const session = gameSessions[sessionId];
 
-    const playerIndex = session.players.findIndex(
-      (p) => p.id === socket.id
-    );
-
-    if (playerIndex !== -1) {
-      session.players.splice(playerIndex, 1);
-
-      io.to(sessionId).emit("player_left", session.players);
-
-      // delete session if empty
-      if (session.players.length === 0) {
-        delete gameSessions[sessionId];
-        console.log(`Session deleted: ${sessionId}`);
-      }
-
-      // if game master left → assign new master
-      if (session.gameMaster === socket.id && session.players.length > 0) {
-        session.gameMaster = session.players[0].id;
-
-        io.to(sessionId).emit("new_game_master", {
-          gameMaster: session.gameMaster,
-        });
-      }
-
-      break;
+    if (!session) {
+      return socket.emit("error", "Session not found");
     }
-  }
 
-  console.log("User disconnected:", socket.id);
-});
+    if (session.status === "in-progress") {
+      return socket.emit("error", "Game already started. Cannot join.");
+    }
 
+    if (session.status === "ended") {
+      return socket.emit("error", "Game already ended");
+    }
+
+    const alreadyIn = session.players.some((p) => p.id === socket.id);
+
+    if (alreadyIn) {
+      return socket.emit("error", "Already in session");
+    }
+
+    const playerExists = session.players.find((p) => p.id === socket.id);
+    if (playerExists) return;
+
+    const newPlayer = {
+      id: socket.id,
+      username,
+      score: 0,
+      attemptsLeft: 3,
+    };
+
+    session.players.push(newPlayer);
+
+    emitGameState(sessionId);
+
+    socket.join(sessionId);
+
+    io.to(sessionId).emit("player_joined", session.players);
+
+    console.log(`Player joined session ${sessionId}`);
+  });
+
+  // Start game
+  socket.on("start_game", ({ sessionId }) => {
+    const session = gameSessions[sessionId];
+
+    if (!session) {
+      return socket.emit("error", "Session not found");
+    }
+
+    if (session.gameMaster !== socket.id) {
+      return socket.emit("error", "Only game master can start the game");
+    }
+
+    if (session.players.length < 3) {
+      return socket.emit("error", "At least 3 players required");
+    }
+
+    session.status = "in-progress";
+    startGameTimer(sessionId);
+    emitGameState(sessionId);
+
+    io.to(sessionId).emit("game_started");
+
+    console.log(`Game started in session ${sessionId}`);
+  });
+
+  // Game Master sets question & answer
+  socket.on("set_question", ({ sessionId, question, answer }) => {
+    const session = gameSessions[sessionId];
+
+    if (!session) {
+      return socket.emit("error", "Session not found");
+    }
+
+    if (session.gameMaster !== socket.id) {
+      return socket.emit("error", "Only game master can set question");
+    }
+
+    if (session.status !== "in-progress") {
+      return socket.emit("error", "Game not started");
+    }
+
+    session.question = question;
+    session.answer = answer.toLowerCase();
+
+    // reset attempts for all players
+    session.players.forEach((player) => {
+      player.attemptsLeft = 3;
+    });
+
+    io.to(sessionId).emit("question_set", {
+      question: session.question,
+    });
+
+    console.log(`Question set for session ${sessionId}`);
+  });
+
+  // Players submit answers
+  socket.on("submit_answer", ({ sessionId, answer }) => {
+    const session = gameSessions[sessionId];
+
+    if (!session) {
+      return socket.emit("error", "Session not found");
+    }
+
+    if (session.status !== "in-progress") {
+      return socket.emit("error", "Game not active");
+    }
+
+    const player = session.players.find((p) => p.id === socket.id);
+
+    if (!player) {
+      return socket.emit("error", "Player not in session");
+    }
+
+    if (player.attemptsLeft <= 0) {
+      return socket.emit("error", "No attempts left");
+    }
+
+    player.attemptsLeft--;
+
+    const normalizedAnswer = answer.toLowerCase();
+
+    if (normalizedAnswer === session.answer) {
+      session.status = "ended";
+
+      player.score += 10;
+
+      io.to(sessionId).emit("game_ended", {
+        winner: player.username,
+        answer: session.answer,
+        players: session.players,
+      });
+
+      emitGameState(sessionId);
+
+      console.log(`Winner: ${player.username}`);
+      return;
+    }
+
+    socket.emit("wrong_answer", {
+      attemptsLeft: player.attemptsLeft,
+    });
+  });
+
+  // Player disconnect
+  socket.on("disconnect", () => {
+    for (const sessionId in gameSessions) {
+      const session = gameSessions[sessionId];
+
+      const playerIndex = session.players.findIndex((p) => p.id === socket.id);
+
+      if (playerIndex !== -1) {
+        session.players.splice(playerIndex, 1);
+
+        io.to(sessionId).emit("player_left", session.players);
+
+        // delete session if empty
+        if (session.players.length === 0) {
+          delete gameSessions[sessionId];
+          console.log(`Session deleted: ${sessionId}`);
+        }
+
+        // if game master left → assign new master
+        if (session.gameMaster === socket.id && session.players.length > 0) {
+          session.gameMaster = session.players[0].id;
+
+          io.to(sessionId).emit("new_game_master", {
+            gameMaster: session.gameMaster,
+          });
+        }
+
+        break;
+      }
+    }
+
+    console.log("User disconnected:", socket.id);
+  });
 });
 
 // Game timer
@@ -241,8 +253,23 @@ const startGameTimer = (sessionId: string) => {
       reason: "timeout",
     });
 
+    emitGameState(sessionId);
+
     console.log(`Game ended by timeout: ${sessionId}`);
   }, 60000);
+};
+
+const emitGameState = (sessionId: string) => {
+  const session = gameSessions[sessionId];
+  if (!session) return;
+
+  io.to(sessionId).emit("game_state", {
+    id: session.id,
+    status: session.status,
+    players: session.players,
+    question: session.question,
+    gameMaster: session.gameMaster,
+  });
 };
 
 const PORT = process.env.PORT || 5500;
