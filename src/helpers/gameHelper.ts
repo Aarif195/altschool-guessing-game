@@ -18,6 +18,11 @@ export const startGameTimer = (io: Server, sessionId: string) => {
   const session = gameSessions[sessionId];
   if (!session) return;
 
+  // Clear existing timer to prevent multiple concurrent timers
+  if (session.timer) {
+    clearTimeout(session.timer);
+  }
+
   session.timer = setTimeout(() => {
     if (session.status !== "in-progress") return;
 
