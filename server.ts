@@ -108,6 +108,37 @@ socket.on("start_game", ({ sessionId }) => {
   console.log(`Game started in session ${sessionId}`);
 });
 
+// Game Master sets question & answer
+socket.on("set_question", ({ sessionId, question, answer }) => {
+  const session = gameSessions[sessionId];
+
+  if (!session) {
+    return socket.emit("error", "Session not found");
+  }
+
+  if (session.gameMaster !== socket.id) {
+    return socket.emit("error", "Only game master can set question");
+  }
+
+  if (session.status !== "in-progress") {
+    return socket.emit("error", "Game not started");
+  }
+
+  session.question = question;
+  session.answer = answer.toLowerCase();
+
+  // reset attempts for all players
+  session.players.forEach(player => {
+    player.attemptsLeft = 3;
+  });
+
+  io.to(sessionId).emit("question_set", {
+    question: session.question,
+  });
+
+  console.log(`Question set for session ${sessionId}`);
+});
+
   socket.on("disconnect", () => {
     console.log("User disconnected:", socket.id);
   });
