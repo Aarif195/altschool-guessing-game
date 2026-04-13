@@ -3,6 +3,7 @@ import http from "http";
 import { Server } from "socket.io";
 import cors from "cors";
 import { gameSessions, GameSession } from "./src/store/gameStore";
+import { emitGameState, startGameTimer } from "./src/helpers/gameHelper";
 
 const app = express();
 const server = http.createServer(app);
@@ -88,7 +89,7 @@ io.on("connection", (socket) => {
 
     session.players.push(newPlayer);
 
-    emitGameState(sessionId);
+    emitGameState(io, sessionId);
 
     socket.join(sessionId);
 
@@ -114,8 +115,8 @@ io.on("connection", (socket) => {
     }
 
     session.status = "in-progress";
-    startGameTimer(sessionId);
-    emitGameState(sessionId);
+    startGameTimer(io, sessionId);
+    emitGameState(io, sessionId);
 
     io.to(sessionId).emit("game_started");
 
@@ -190,7 +191,7 @@ io.on("connection", (socket) => {
         players: session.players,
       });
 
-      emitGameState(sessionId);
+      emitGameState(io, sessionId);
 
       console.log(`Winner: ${player.username}`);
       return;
@@ -236,41 +237,7 @@ io.on("connection", (socket) => {
   });
 });
 
-// Game timer
-const startGameTimer = (sessionId: string) => {
-  const session = gameSessions[sessionId];
-  if (!session) return;
 
-  session.timer = setTimeout(() => {
-    if (session.status !== "in-progress") return;
-
-    session.status = "ended";
-
-    io.to(sessionId).emit("game_ended", {
-      winner: null,
-      answer: session.answer,
-      players: session.players,
-      reason: "timeout",
-    });
-
-    emitGameState(sessionId);
-
-    console.log(`Game ended by timeout: ${sessionId}`);
-  }, 60000);
-};
-
-const emitGameState = (sessionId: string) => {
-  const session = gameSessions[sessionId];
-  if (!session) return;
-
-  io.to(sessionId).emit("game_state", {
-    id: session.id,
-    status: session.status,
-    players: session.players,
-    question: session.question,
-    gameMaster: session.gameMaster,
-  });
-};
 
 const PORT = process.env.PORT || 5500;
 
