@@ -139,6 +139,52 @@ socket.on("set_question", ({ sessionId, question, answer }) => {
   console.log(`Question set for session ${sessionId}`);
 });
 
+// Players submit answers
+socket.on("submit_answer", ({ sessionId, answer }) => {
+  const session = gameSessions[sessionId];
+
+  if (!session) {
+    return socket.emit("error", "Session not found");
+  }
+
+  if (session.status !== "in-progress") {
+    return socket.emit("error", "Game not active");
+  }
+
+  const player = session.players.find(p => p.id === socket.id);
+
+  if (!player) {
+    return socket.emit("error", "Player not in session");
+  }
+
+  if (player.attemptsLeft <= 0) {
+    return socket.emit("error", "No attempts left");
+  }
+
+  player.attemptsLeft--;
+
+  const normalizedAnswer = answer.toLowerCase();
+
+  if (normalizedAnswer === session.answer) {
+    session.status = "ended";
+
+    player.score += 10;
+
+    io.to(sessionId).emit("game_ended", {
+      winner: player.username,
+      answer: session.answer,
+      players: session.players,
+    });
+
+    console.log(`Winner: ${player.username}`);
+    return;
+  }
+
+  socket.emit("wrong_answer", {
+    attemptsLeft: player.attemptsLeft,
+  });
+});
+
   socket.on("disconnect", () => {
     console.log("User disconnected:", socket.id);
   });
