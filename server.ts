@@ -102,6 +102,7 @@ socket.on("start_game", ({ sessionId }) => {
   }
 
   session.status = "in-progress";
+  startGameTimer(sessionId);
 
   io.to(sessionId).emit("game_started");
 
@@ -190,6 +191,27 @@ socket.on("submit_answer", ({ sessionId, answer }) => {
   });
 
 });
+
+// Game timer
+const startGameTimer = (sessionId: string) => {
+  const session = gameSessions[sessionId];
+  if (!session) return;
+
+  session.timer = setTimeout(() => {
+    if (session.status !== "in-progress") return;
+
+    session.status = "ended";
+
+    io.to(sessionId).emit("game_ended", {
+      winner: null,
+      answer: session.answer,
+      players: session.players,
+      reason: "timeout",
+    });
+
+    console.log(`Game ended by timeout: ${sessionId}`);
+  }, 60000);
+};
 
 const PORT = process.env.PORT || 5500;
 
