@@ -54,6 +54,10 @@ function App() {
     setTimeout(() => setInfo(null), 2000);
   };
 
+  const leaderboard = session?.players
+    ? [...session.players].sort((a, b) => b.score - a.score)
+    : [];
+
   useEffect(() => {
     socket.on("session_created", (data) => {
       setSession(data);
@@ -191,19 +195,33 @@ function App() {
           <div className="bg-gray-900 p-4 rounded-xl">
 
             <div className="mb-3">
-              <h2 className="font-bold">Players</h2>
+              <h2 className="font-bold">Leaderboard</h2>
               <p className="text-xs text-gray-400">
-                {session.status === "waiting"
-                  ? "Waiting for game to start"
-                  : "Game in progress"}
+                Highest score leads the game
               </p>
             </div>
 
-            {session.players.map((p) => (
-              <div key={p.id} className="text-sm mb-2">
-                {p.username} — {p.score} pts ({p.attemptsLeft} tries)
+            {leaderboard.map((p, index) => (
+              <div
+                key={p.id}
+                className={`text-sm mb-2 p-2 rounded ${index === 0 ? "bg-yellow-600" : "bg-gray-800"
+                  }`}
+              >
+                <div className="flex justify-between">
+                  <span>
+                    {index === 0 ? "👑 " : ""}
+                    {p.username}
+                  </span>
+
+                  <span>{p.score} pts</span>
+                </div>
+
+                <div className="text-xs text-gray-400">
+                  {p.attemptsLeft} attempts left
+                </div>
               </div>
             ))}
+
           </div>
 
           {/* MIDDLE: Chat */}
@@ -244,8 +262,8 @@ function App() {
                 <div
                   key={i}
                   className={`text-sm p-2 rounded ${m.type === "system"
-                      ? "bg-gray-800"
-                      : "bg-gray-700"
+                    ? "bg-gray-800"
+                    : "bg-gray-700"
                     }`}
                 >
                   {m.text}
@@ -270,8 +288,8 @@ function App() {
                     placeholder="Type your answer..."
                     disabled={!isGameActive}
                     className={`w-full p-2 rounded outline-none ${isGameActive
-                        ? "bg-gray-800"
-                        : "bg-gray-700 opacity-50 cursor-not-allowed"
+                      ? "bg-gray-800"
+                      : "bg-gray-700 opacity-50 cursor-not-allowed"
                       }`}
                     onKeyDown={(e) => {
                       if (!isGameActive) return;
