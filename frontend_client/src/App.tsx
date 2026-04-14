@@ -23,6 +23,8 @@ type Message = {
   text: string;
 };
 
+
+
 function App() {
   const [session, setSession] = useState<GameSession | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -39,6 +41,14 @@ function App() {
   const joinSession = () => {
     if (!username || !sessionId) return;
     socket.emit("join_session", { sessionId, username });
+  };
+
+  const copySessionId = () => {
+    if (!session?.id) return;
+    navigator.clipboard.writeText(session.id);
+    setInfo("Session ID copied");
+
+    setTimeout(() => setInfo(null), 2000);
   };
 
   useEffect(() => {
@@ -176,7 +186,15 @@ function App() {
 
           {/* LEFT: Players */}
           <div className="bg-gray-900 p-4 rounded-xl">
-            <h2 className="font-bold mb-3">Players</h2>
+
+            <div className="mb-3">
+              <h2 className="font-bold">Players</h2>
+              <p className="text-xs text-gray-400">
+                {session.status === "waiting"
+                  ? "Waiting for game to start"
+                  : "Game in progress"}
+              </p>
+            </div>
 
             {session.players.map((p) => (
               <div key={p.id} className="text-sm mb-2">
@@ -188,9 +206,18 @@ function App() {
           {/* MIDDLE: Chat */}
           <div className="bg-gray-900 p-4 rounded-xl md:col-span-2 flex flex-col">
 
-            <h2 className="font-bold mb-3">
-              Session: {session.id}
-            </h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-bold">
+                Session: {session.id}
+              </h2>
+
+              <button
+                onClick={copySessionId}
+                className="text-xs bg-gray-700 px-2 py-1 rounded"
+              >
+                Copy ID
+              </button>
+            </div>
 
             <div className="flex-1 overflow-y-auto space-y-2 mb-4">
               {messages.map((m, i) => (
