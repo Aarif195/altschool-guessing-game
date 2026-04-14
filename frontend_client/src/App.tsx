@@ -36,6 +36,7 @@ function App() {
   const isGameEnded = session?.status === "ended";
   const isWaiting = session?.status === "waiting";
   const [timeLeft, setTimeLeft] = useState<number>(60);
+  const [winner, setWinner] = useState<string | null>(null);
 
   const createSession = () => {
     if (!username) return;
@@ -81,6 +82,8 @@ function App() {
     });
 
     socket.on("game_started", () => {
+      setWinner(null);
+
       setMessages((prev) => [
         ...prev,
         { type: "game", text: "Game started!" },
@@ -98,23 +101,31 @@ function App() {
       ]);
     });
 
-    socket.on("game_ended", ({ winner, answer, reason }) => {
+    socket.on("game_ended", ({ winner, answer }) => {
+      setWinner(winner || null);
+
       setMessages((prev) => [
         ...prev,
         {
           type: "game",
           text: winner
             ? `Winner: ${winner}`
-            : `Game ended. No winner. Answer: ${answer}`,
+            : `No winner. Answer: ${answer}`,
         },
       ]);
+
+      setTimeout(() => {
+        setSession((prev) =>
+          prev ? { ...prev, status: "waiting", question: null } : prev
+        );
+      }, 3000);
+
     });
 
     socket.on("timer_update", (time: number) => {
       setTimeLeft(time);
     });
 
-    socket.off("timer_update");
 
     // SYSTEM ERROR HANDLING
     socket.on("error", (msg) => {
@@ -125,11 +136,22 @@ function App() {
 
 
     // SESSION INFO FEEDBACK
-    socket.on("session_created", (data) => {
-      setSession(data);
-      setInfo("Session created successfully");
+    // socket.on("session_created", (data) => {
+    //   setSession(data);
+    //   setInfo("Session created successfully");
 
-      setTimeout(() => setInfo(null), 3000);
+    //   setTimeout(() => setInfo(null), 3000);
+    // });
+
+    socket.on("new_game_master", ({ gameMaster }) => {
+      setSession((prev) =>
+        prev ? { ...prev, gameMaster } : prev
+      );
+
+      setMessages((prev) => [
+        ...prev,
+        { type: "system", text: "New game master selected" },
+      ]);
     });
 
     return () => {
@@ -138,6 +160,8 @@ function App() {
       socket.off("game_started");
       socket.off("question_set");
       socket.off("game_ended");
+      socket.off("timer_update");
+      socket.off("new_game_master");
     };
   }, []);
 
@@ -263,11 +287,18 @@ function App() {
 
             {/* GAME END SCREEN */}
             {isGameEnded && (
-              <div className="bg-green-700 p-3 rounded mb-3">
-                <h3 className="font-bold">Game Ended</h3>
-                <p className="text-sm mt-1">
-                  Check chat for winner or final result.
-                </p>
+              <div className="bg-green-700 p-4 rounded mb-3 text-center">
+                <h3 className="font-bold text-lg">Game Ended</h3>
+
+                {winner ? (
+                  <p className="mt-2 text-xl font-bold">
+                    🎉 {winner} won!
+                  </p>
+                ) : (
+                  <p className="mt-2 text-sm">
+                    No winner this round
+                  </p>
+                )}
               </div>
             )}
 
