@@ -32,6 +32,9 @@ function App() {
   const [sessionId, setSessionId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const isGameActive = session?.status === "in-progress";
+  const isGameEnded = session?.status === "ended";
+  const isWaiting = session?.status === "waiting";
 
   const createSession = () => {
     if (!username) return;
@@ -217,15 +220,32 @@ function App() {
               >
                 Copy ID
               </button>
+
+              {/* LIVE STATUS (FIXED PLACEMENT) */}
+              {isGameActive && (
+                <span className="text-xs text-yellow-400 ml-2">
+                  Live Game Running...
+                </span>
+              )}
             </div>
+
+            {/* GAME END SCREEN */}
+            {isGameEnded && (
+              <div className="bg-green-700 p-3 rounded mb-3">
+                <h3 className="font-bold">Game Ended</h3>
+                <p className="text-sm mt-1">
+                  Check chat for winner or final result.
+                </p>
+              </div>
+            )}
 
             <div className="flex-1 overflow-y-auto space-y-2 mb-4">
               {messages.map((m, i) => (
                 <div
                   key={i}
                   className={`text-sm p-2 rounded ${m.type === "system"
-                    ? "bg-gray-800"
-                    : "bg-gray-700"
+                      ? "bg-gray-800"
+                      : "bg-gray-700"
                     }`}
                 >
                   {m.text}
@@ -236,22 +256,26 @@ function App() {
             {/* GAME CONTROLS */}
             <div className="border-t border-gray-700 pt-3 space-y-3">
 
-              {/* Only show when game is in progress */}
+              {/* ONLY IN-GAME SECTION */}
               {session.status === "in-progress" && (
                 <>
-                  {/* QUESTION DISPLAY */}
                   {session.question && (
                     <div className="bg-gray-800 p-2 rounded text-sm">
                       <strong>Question:</strong> {session.question}
                     </div>
                   )}
 
-                  {/* ANSWER INPUT */}
                   <input
                     type="text"
                     placeholder="Type your answer..."
-                    className="w-full p-2 rounded bg-gray-800 outline-none"
+                    disabled={!isGameActive}
+                    className={`w-full p-2 rounded outline-none ${isGameActive
+                        ? "bg-gray-800"
+                        : "bg-gray-700 opacity-50 cursor-not-allowed"
+                      }`}
                     onKeyDown={(e) => {
+                      if (!isGameActive) return;
+
                       if (e.key === "Enter") {
                         socket.emit("submit_answer", {
                           sessionId: session.id,
@@ -266,58 +290,60 @@ function App() {
               )}
 
               {/* GAME MASTER CONTROLS */}
-              {session.gameMaster === socket.id && session.status === "waiting" && (
-                <div className="space-y-2">
+              {session.gameMaster === socket.id &&
+                session.status === "waiting" && (
+                  <div className="space-y-2">
 
-                  <button
-                    onClick={() =>
-                      socket.emit("start_game", { sessionId: session.id })
-                    }
-                    className="w-full bg-blue-600 py-2 rounded"
-                  >
-                    Start Game
-                  </button>
+                    <button
+                      onClick={() =>
+                        socket.emit("start_game", { sessionId: session.id })
+                      }
+                      className="w-full bg-blue-600 py-2 rounded"
+                    >
+                      Start Game
+                    </button>
 
-                  <input
-                    type="text"
-                    placeholder="Set question"
-                    className="w-full p-2 rounded bg-gray-800 outline-none"
-                    id="qInput"
-                  />
+                    <input
+                      type="text"
+                      placeholder="Set question"
+                      className="w-full p-2 rounded bg-gray-800 outline-none"
+                      id="qInput"
+                    />
 
-                  <input
-                    type="text"
-                    placeholder="Set answer"
-                    className="w-full p-2 rounded bg-gray-800 outline-none"
-                    id="aInput"
-                  />
+                    <input
+                      type="text"
+                      placeholder="Set answer"
+                      className="w-full p-2 rounded bg-gray-800 outline-none"
+                      id="aInput"
+                    />
 
-                  <button
-                    onClick={() => {
-                      const q = (document.getElementById("qInput") as HTMLInputElement).value;
-                      const a = (document.getElementById("aInput") as HTMLInputElement).value;
+                    <button
+                      onClick={() => {
+                        const q = (document.getElementById("qInput") as HTMLInputElement).value;
+                        const a = (document.getElementById("aInput") as HTMLInputElement).value;
 
-                      socket.emit("set_question", {
-                        sessionId: session.id,
-                        question: q,
-                        answer: a,
-                      });
-                    }}
-                    className="w-full bg-green-600 py-2 rounded"
-                  >
-                    Set Question
-                  </button>
-                </div>
-              )}
-
+                        socket.emit("set_question", {
+                          sessionId: session.id,
+                          question: q,
+                          answer: a,
+                        });
+                      }}
+                      className="w-full bg-green-600 py-2 rounded"
+                    >
+                      Set Question
+                    </button>
+                  </div>
+                )}
             </div>
-
-
           </div>
+
+
+
         </div>
       )}
     </div>
   );
+
 }
 
 export default App;
