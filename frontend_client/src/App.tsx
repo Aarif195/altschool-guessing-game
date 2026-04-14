@@ -35,6 +35,7 @@ function App() {
   const isGameActive = session?.status === "in-progress";
   const isGameEnded = session?.status === "ended";
   const isWaiting = session?.status === "waiting";
+  const [timeLeft, setTimeLeft] = useState<number>(60);
 
   const createSession = () => {
     if (!username) return;
@@ -109,12 +110,19 @@ function App() {
       ]);
     });
 
+    socket.on("timer_update", (time: number) => {
+      setTimeLeft(time);
+    });
+
+    socket.off("timer_update");
+
     // SYSTEM ERROR HANDLING
     socket.on("error", (msg) => {
       setError(msg);
 
       setTimeout(() => setError(null), 3000);
     });
+
 
     // SESSION INFO FEEDBACK
     socket.on("session_created", (data) => {
@@ -231,6 +239,12 @@ function App() {
               <h2 className="font-bold">
                 Session: {session.id}
               </h2>
+
+              {isGameActive && (
+                <span className="text-xs text-yellow-400">
+                  ⏱ {timeLeft}s
+                </span>
+              )}
 
               <button
                 onClick={copySessionId}
