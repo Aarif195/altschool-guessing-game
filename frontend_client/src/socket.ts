@@ -1,4 +1,5 @@
 import { io } from "socket.io-client";
 
-export const socket = io("http://localhost:5500");
+const BACKEND_URL = "https://altschool-guessing-game.onrender.com";
 
+export const socket = io(BACKEND_URL);
