@@ -33,7 +33,7 @@ function App() {
   const [info, setInfo] = useState<string | null>(null);
   const isGameActive = session?.status === "in-progress";
   const isGameEnded = session?.status === "ended";
-  const isWaiting = session?.status === "waiting";
+  // const isWaiting = session?.status === "waiting";
   const [timeLeft, setTimeLeft] = useState<number>(60);
   const [winner, setWinner] = useState<string | null>(null);
 
