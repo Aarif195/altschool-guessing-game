@@ -24,7 +24,6 @@ type Message = {
 };
 
 
-
 function App() {
   const [session, setSession] = useState<GameSession | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -44,8 +43,15 @@ function App() {
   };
 
   const joinSession = () => {
+
+    console.log("[JOIN CLICKED]", { username, sessionId, socketId: socket.id });
+
     if (!username || !sessionId) return;
     socket.emit("join_session", { sessionId, username });
+
+    console.log("[JOIN EMIT SENT]");
+
+
   };
 
   const copySessionId = () => {
@@ -70,6 +76,11 @@ function App() {
       ]);
     });
 
+
+    socket.on("game_state", (data) => {
+      setSession(data);
+    });
+
     socket.on("player_joined", (players) => {
       setSession((prev) =>
         prev ? { ...prev, players } : prev
@@ -90,11 +101,19 @@ function App() {
       ]);
     });
 
-    socket.on("question_set", ({ question }) => {
-      setSession((prev) =>
-        prev ? { ...prev, question } : prev
-      );
+    // socket.on("question_set", ({ question }) => {
+    //   setSession((prev) =>
+    //     prev ? { ...prev, question } : prev
+    //   );
 
+    //   setMessages((prev) => [
+    //     ...prev,
+    //     { type: "game", text: `Question: ${question}` },
+    //   ]);
+    // });
+
+
+    socket.on("question_set", ({ question }) => {
       setMessages((prev) => [
         ...prev,
         { type: "game", text: `Question: ${question}` },
@@ -122,9 +141,15 @@ function App() {
 
     });
 
+
+    socket.on("game_ended", ({ winner, answer }) => {
+      console.log("🔥 GAME ENDED RECEIVED:", winner, answer);
+    });
+
     socket.on("timer_update", (time: number) => {
       setTimeLeft(time);
     });
+
 
 
     // SYSTEM ERROR HANDLING
@@ -162,8 +187,10 @@ function App() {
       socket.off("game_ended");
       socket.off("timer_update");
       socket.off("new_game_master");
+      socket.off("game_state");
     };
   }, []);
+
 
 
   return (
@@ -174,6 +201,8 @@ function App() {
           {error}
         </div>
       )}
+
+
 
       {info && (
         <div className="fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded">
@@ -197,7 +226,7 @@ function App() {
 
           <button
             onClick={createSession}
-            className="w-full bg-blue-600 py-3 rounded-lg mb-4"
+            className="w-full bg-blue-600 py-3 rounded-lg mb-4 cursor-pointer"
           >
             Create Game
           </button>
@@ -214,7 +243,7 @@ function App() {
 
           <button
             onClick={joinSession}
-            className="w-full bg-green-600 py-3 rounded-lg"
+            className="w-full bg-green-600 py-3 rounded-lg cursor-pointer"
           >
             Join Game
           </button>
@@ -272,7 +301,7 @@ function App() {
 
               <button
                 onClick={copySessionId}
-                className="text-xs bg-gray-700 px-2 py-1 rounded"
+                className="text-xs bg-gray-700 px-2 py-1 rounded cursor-pointer"
               >
                 Copy ID
               </button>
@@ -320,7 +349,7 @@ function App() {
             <div className="border-t border-gray-700 pt-3 space-y-3">
 
               {/* ONLY IN-GAME SECTION */}
-              {session.status === "in-progress" && (
+              {session.question && (
                 <>
                   {session.question && (
                     <div className="bg-gray-800 p-2 rounded text-sm">
@@ -352,6 +381,7 @@ function App() {
                 </>
               )}
 
+
               {/* GAME MASTER CONTROLS */}
               {session.gameMaster === socket.id &&
                 session.status === "waiting" && (
@@ -361,7 +391,7 @@ function App() {
                       onClick={() =>
                         socket.emit("start_game", { sessionId: session.id })
                       }
-                      className="w-full bg-blue-600 py-2 rounded"
+                      className="w-full bg-blue-600 py-2 rounded cursor-pointer"
                     >
                       Start Game
                     </button>
@@ -380,10 +410,16 @@ function App() {
                       id="aInput"
                     />
 
+
                     <button
                       onClick={() => {
                         const q = (document.getElementById("qInput") as HTMLInputElement).value;
                         const a = (document.getElementById("aInput") as HTMLInputElement).value;
+
+                        if (!q || !a) {
+                          setError("Question and answer required");
+                          return;
+                        }
 
                         socket.emit("set_question", {
                           sessionId: session.id,
@@ -391,7 +427,7 @@ function App() {
                           answer: a,
                         });
                       }}
-                      className="w-full bg-green-600 py-2 rounded"
+                      className="w-full bg-green-600 py-2 rounded cursor-pointer"
                     >
                       Set Question
                     </button>
